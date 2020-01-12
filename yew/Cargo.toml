@@ -1,0 +1,14 @@
+[package]
+name = "sudachi-yew-sample"
+version = "0.1.0"
+authors = ["vraisamis <quick.sorting.arg@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = '*'
+yew = '*'
+sudachi = { path = '../sudachi.rs' }
