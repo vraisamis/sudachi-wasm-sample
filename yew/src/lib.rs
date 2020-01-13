@@ -1,9 +1,9 @@
-#![recursion_limit = "256"]
+#![recursion_limit = "1024"]
 
 extern crate wasm_bindgen;
 
-use std::panic::{catch_unwind, AssertUnwindSafe};
 use sudachi::tokenizer::{Mode, Tokenizer};
+use unic_normal::StrNormalForm;
 use wasm_bindgen::prelude::wasm_bindgen;
 use yew::prelude::{html, App, Component, ComponentLink, Html, InputData, ShouldRender};
 
@@ -17,24 +17,10 @@ struct Token {
     reading: String,
 }
 
-impl Token {
-    fn to_tr(&self) -> Html {
-        html! {
-            <tr>
-                <td>{ self.surface.clone() }</td>
-                <td>{ self.pos.clone() }</td>
-                <td>{ self.normalized.clone() }</td>
-                <td>{ self.dictionary.clone() }</td>
-                <td>{ self.reading.clone() }</td>
-            </tr>
-        }
-    }
-}
 struct Model {
     tokenizer: Tokenizer<'static>,
     text: String,
     tokens: Vec<Token>,
-    err: String,
     link: ComponentLink<Self>,
 }
 enum Msg {
@@ -43,27 +29,18 @@ enum Msg {
 
 impl Model {
     fn tokenize(&mut self) {
-        match catch_unwind(AssertUnwindSafe(|| {
-            self.tokenizer.tokenize(&self.text, &Mode::C, false)
-        })) {
-            Ok(tokens) => {
-                self.tokens = tokens
-                    .into_iter()
-                    .map(|morpheme| Token {
-                        surface: morpheme.surface().to_string(),
-                        pos: morpheme.pos().join(","),
-                        normalized: morpheme.normalized_form().to_string(),
-                        dictionary: morpheme.dictionary_form().to_string(),
-                        reading: morpheme.reading_form().to_string(),
-                    })
-                    .collect::<Vec<Token>>();
-                self.err = "".to_string();
-            }
-            Err(_) => {
-                self.tokens = vec![];
-                self.err = "tokenize error".into();
-            }
-        }
+        let text = self.text.nfkc().collect::<String>();
+        let tokens = self.tokenizer.tokenize(&text, &Mode::C, false);
+        self.tokens = tokens
+            .into_iter()
+            .map(|morpheme| Token {
+                surface: morpheme.surface().to_string(),
+                pos: morpheme.pos().join(","),
+                normalized: morpheme.normalized_form().to_string(),
+                dictionary: morpheme.dictionary_form().to_string(),
+                reading: morpheme.reading_form().to_string(),
+            })
+            .collect::<Vec<Token>>();
     }
 }
 impl Component for Model {
@@ -75,7 +52,6 @@ impl Component for Model {
             tokenizer: Tokenizer::new(BYTES),
             text: "".into(),
             tokens: vec![],
-            err: "".into(),
             link: link,
         }
     }
@@ -99,8 +75,6 @@ impl Component for Model {
                     oninput = self.link.callback(|e: InputData| Msg::Change(e.value))
                     value = {&self.text}
                     />
-                <p>{self.tokens.len()}</p>
-                <p>{self.text.clone()}</p>
                 <table>
                     <thead>
                         <tr>
@@ -112,10 +86,21 @@ impl Component for Model {
                         </tr>
                     </thead>
                     <tbody>
-                        { self.tokens.iter().map(|t| t.to_tr()).collect::<Html>() }
+                        {
+                            self.tokens.iter().map(|t| {
+                                html! {
+                                    <tr>
+                                        <td>{ t.surface.clone() }</td>
+                                        <td>{ t.pos.clone() }</td>
+                                        <td>{ t.normalized.clone() }</td>
+                                        <td>{ t.dictionary.clone() }</td>
+                                        <td>{ t.reading.clone() }</td>
+                                    </tr>
+                                }
+                            }).collect::<Html>()
+                        }
                     </tbody>
                 </table>
-                <div>{ self.err.clone() }</div>
             </>
         }
     }
@@ -127,20 +112,4 @@ pub fn run() {
     let app: App<Model> = App::new();
     app.mount_to_body();
     yew::run_loop();
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn test_tokenize() {
-        let tokenizer = Tokenizer::new(BYTES);
-        let s = "？？？".to_string();
-        let opt = catch_unwind(AssertUnwindSafe(|| tokenizer.tokenize(&s, &Mode::C, true)));
-        assert_eq!(opt.is_err(), true);
-
-        let s = "日本語".to_string();
-        let opt = catch_unwind(AssertUnwindSafe(|| tokenizer.tokenize(&s, &Mode::C, true)));
-        assert_eq!(opt.is_ok(), true);
-    }
 }

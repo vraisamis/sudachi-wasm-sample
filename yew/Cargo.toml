@@ -9,6 +9,10 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-wasm-bindgen = '*'
-yew = '*'
-sudachi = { path = '../sudachi.rs' }
+wasm-bindgen = '0.2.58'
+yew = '0.11.0'
+unic-normal = '0.9.0'
+
+[dependencies.sudachi]
+git = 'https://github.com/sorami/sudachi.rs'
+rev = '3600c8e4d0d570b97593bd2ff23d3bb66ba42d47'
